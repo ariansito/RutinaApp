@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RutinaApp - Gestor de Rutinas</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="RutinaApp">
+    <meta name="description" content="Aplicación minimalista para gestionar rutinas de trabajo y vida personal">
+    
+    <!-- PWA Links -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDE5MiAxOTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiByeD0iMjQiIGZpbGw9InVybCgjZ3JhZGllbnQwX2xpbmVhcl8xXzEpIi8+CjxwYXRoIGQ9Ik05NiA0OEM3My45MDg2IDQ4IDU2IDY1LjkwODYgNTYgODhWMTQ0QzU2IDE2Ni4wOTEgNzMuOTA4NiAxODQgOTYgMTg0QzExOC4wOTEgMTg0IDEzNiAxNjYuMDkxIDEzNiAxNDRWODhDMTM2IDY1LjkwODYgMTE4LjA5MSA0OCA5NiA0OFoiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik04OCA5NkM4OCA5MS41ODE3IDkxLjU4MTcgODggOTYgODhIMTA0QzEwOC40MTggODggMTEyIDkxLjU4MTcgMTEyIDk2VjEwNEMxMTIgMTA4LjQxOCAxMDguNDE4IDExMiAxMDQgMTEySDk2QzkxLjU4MTcgMTEyIDg4IDEwOC40MTggODggMTA0Vjk2WiIgZmlsbD0iIzY2N0VFQSIvPgo8ZGVmcz4KPGxpbmVhckdyYWRpZW50IGlkPSJncmFkaWVudDBfbGluZWFyXzFfMSIgeDE9IjAiIHkxPSIwIiB4Mj0iMTkyIiB5Mj0iMTkyIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CjxzdG9wIHN0b3AtY29sb3I9IiM2NjdFRUEiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNzY0QkEyIi8+CjwvbGluZWFyR3JhZGllbnQ+CjwvZGVmcz4KPC9zdmc+Cg==">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>RutinaApp</h1>
+            <button class="add-btn" id="addTaskBtn">
+                <i class="fas fa-plus"></i>
+            </button>
+        </header>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="work">
+                <i class="fas fa-briefcase"></i>
+                Trabajo
+            </button>
+            <button class="tab-btn" data-tab="life">
+                <i class="fas fa-heart"></i>
+                Vida Personal
+            </button>
+        </div>
+
+        <!-- Content -->
+        <main class="content">
+            <!-- Work Tab -->
+            <div class="tab-content active" id="work-content">
+                <div class="tasks-container" id="work-tasks">
+                    <!-- Tasks will be added here dynamically -->
+                </div>
+            </div>
+
+            <!-- Life Tab -->
+            <div class="tab-content" id="life-content">
+                <div class="tasks-container" id="life-tasks">
+                    <!-- Tasks will be added here dynamically -->
+                </div>
+            </div>
+        </main>
+
+        <!-- Add Task Modal -->
+        <div class="modal" id="taskModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Nueva Tarea</h2>
+                    <button class="close-btn" id="closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="taskForm">
+                    <div class="form-group">
+                        <label for="taskTitle">Título</label>
+                        <input type="text" id="taskTitle" name="taskTitle" required placeholder="¿Qué necesitas hacer?">
+                    </div>
+                    <div class="form-group">
+                        <label for="taskCategory">Categoría</label>
+                        <select id="taskCategory" name="taskCategory" required>
+                            <option value="work">Trabajo</option>
+                            <option value="life">Vida Personal</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskTime">Hora</label>
+                        <input type="time" id="taskTime" name="taskTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskPriority">Prioridad</label>
+                        <select id="taskPriority" name="taskPriority" required>
+                            <option value="low">Baja</option>
+                            <option value="medium">Media</option>
+                            <option value="high">Alta</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="cancelBtn">Cancelar</button>
+                        <button type="submit" class="btn-primary">Crear Tarea</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">
+                <i class="fas fa-tasks"></i>
+            </div>
+            <h3>No hay tareas aún</h3>
+            <p>Comienza creando tu primera tarea para organizar tu día</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

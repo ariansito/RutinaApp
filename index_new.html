@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RutinaApp - Gestor de Rutinas</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="RutinaApp">
+    <meta name="description" content="Aplicación minimalista para gestionar rutinas de trabajo y vida personal">
+    
+    <!-- PWA Links -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgdmlld0JveD0iMCAwIDE5MiAxOTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxOTIiIGhlaWdodD0iMTkyIiByeD0iMjQiIGZpbGw9InVybCgjZ3JhZGllbnQwX2xpbmVhcl8xXzEpIi8+CjxwYXRoIGQ9Ik05NiA0OEM3My45MDg2IDQ4IDU2IDY1LjkwODYgNTYgODhWMTQ0QzU2IDE2Ni4wOTEgNzMuOTA4NiAxODQgOTYgMTg0QzExOC4wOTEgMTg0IDEzNiAxNjYuMDkxIDEzNiAxNDRWODhDMTM2IDY1LjkwODYgMTE4LjA5MSA0OCA5NiA0OFoiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik04OCA5NkM4OCA5MS41ODE3IDkxLjU4MTcgODggOTYgODhIMTA0QzEwOC40MTggODggMTEyIDkxLjU4MTcgMTEyIDk2VjEwNEMxMTIgMTA4LjQxOCAxMDguNDE4IDExMiAxMDQgMTEySDk2QzkxLjU4MTcgMTEyIDg4IDEwOC40MTggODggMTA0Vjk2WiIgZmlsbD0iIzY2N0VFQSIvPgo8ZGVmcz4KPGxpbmVhckdyYWRpZW50IGlkPSJncmFkaWVudDBfbGluZWFyXzFfMSIgeDE9IjAiIHkxPSIwIiB4Mj0iMTkyIiB5Mj0iMTkyIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CjxzdG9wIHN0b3AtY29sb3I9IiM2NjdFRUEiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNzY0QkEyIi8+CjwvbGluYWFyR3JhZGllbnQ+CjwvZGVmcz4KPC9zdmc+Cg==">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles_new.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>RutinaApp</h1>
+                <div class="date-info" id="dateInfo">
+                    <div class="current-date" id="currentDate">Cargando...</div>
+                    <div class="current-time" id="currentTime">--:--</div>
+                </div>
+            </div>
+            <button class="add-btn" id="addTaskBtn">
+                <i class="fas fa-plus"></i>
+            </button>
+        </header>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="work">
+                <i class="fas fa-briefcase"></i>
+                Trabajo
+            </button>
+            <button class="tab-btn" data-tab="life">
+                <i class="fas fa-heart"></i>
+                Vida Personal
+            </button>
+            <button class="tab-btn" data-tab="calendar">
+                <i class="fas fa-calendar-alt"></i>
+                Calendario
+            </button>
+        </div>
+
+        <!-- Content -->
+        <main class="content">
+            <!-- Work Tab -->
+            <div class="tab-content active" id="work-content">
+                <div class="tasks-container" id="work-tasks">
+                    <!-- Tasks will be added here dynamically -->
+                </div>
+            </div>
+
+            <!-- Life Tab -->
+            <div class="tab-content" id="life-content">
+                <div class="tasks-container" id="life-tasks">
+                    <!-- Tasks will be added here dynamically -->
+                </div>
+            </div>
+
+            <!-- Calendar Tab -->
+            <div class="tab-content" id="calendar-content">
+                <!-- Today's Events -->
+                <div class="today-events">
+                    <h3><i class="fas fa-bell"></i> Eventos de Hoy</h3>
+                    <div class="events-container" id="todayEvents">
+                        <!-- Today's events will be shown here -->
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="calendar-section">
+                    <h3><i class="fas fa-bolt"></i> Acciones Rápidas</h3>
+                    <div class="quick-actions">
+                        <button id="addWorkScheduleBtn" class="quick-action-btn work-schedule">
+                            <i class="fas fa-clock"></i>
+                            Horario de Trabajo 6x4
+                        </button>
+                        <button id="addWeeklyMeetingBtn" class="quick-action-btn weekly-meeting">
+                            <i class="fas fa-users"></i>
+                            Reunión Semanal
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Calendar View -->
+                <div class="calendar-section">
+                    <h3><i class="fas fa-calendar-alt"></i> Vista del Calendario</h3>
+                    <div class="calendar-view">
+                        <div class="calendar-header">
+                            <div class="calendar-nav">
+                                <button id="prevMonth" title="Mes anterior">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <button id="nextMonth" title="Mes siguiente">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                            <div id="currentMonth" class="current-month">Agosto 2025</div>
+                        </div>
+                        <div id="calendarGrid" class="calendar-grid">
+                            <!-- Calendar days will be generated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selected Day Events -->
+                <div class="events-display" id="selectedDayEvents" style="display: none;">
+                    <h3><i class="fas fa-calendar-day"></i> Eventos del Día Seleccionado</h3>
+                    <div id="selectedDayEventsList" class="events-list">
+                        <!-- Events will be displayed here -->
+                    </div>
+                </div>
+
+                <!-- Upcoming Events -->
+                <div class="calendar-section">
+                    <h3><i class="fas fa-calendar-week"></i> Próximos Eventos</h3>
+                    <div id="upcomingEvents" class="events-list">
+                        <!-- Upcoming events will be displayed here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Add Task Modal -->
+        <div class="modal" id="taskModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Nueva Tarea</h2>
+                    <button class="close-btn" id="closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="taskForm">
+                    <div class="form-group">
+                        <label for="taskTitle">Título</label>
+                        <input type="text" id="taskTitle" name="taskTitle" required placeholder="¿Qué necesitas hacer?">
+                    </div>
+                    <div class="form-group">
+                        <label for="taskCategory">Categoría</label>
+                        <select id="taskCategory" name="taskCategory" required>
+                            <option value="work">Trabajo</option>
+                            <option value="life">Vida Personal</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskTime">Hora</label>
+                        <input type="time" id="taskTime" name="taskTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskPriority">Prioridad</label>
+                        <select id="taskPriority" required>
+                            <option value="">Selecciona prioridad</option>
+                            <option value="low">Baja</option>
+                            <option value="medium">Media</option>
+                            <option value="high">Alta</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="taskRecurring">¿Es una tarea recurrente?</label>
+                        <select id="taskRecurring" onchange="toggleRecurringOptions()">
+                            <option value="no">No, solo una vez</option>
+                            <option value="yes">Sí, semanalmente</option>
+                        </select>
+                    </div>
+                    
+                    <div id="recurringOptions" class="form-group" style="display: none;">
+                        <label>Días de la semana:</label>
+                        <div class="weekday-checkboxes">
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="0"> Domingo
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="1"> Lunes
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="2"> Martes
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="3"> Miércoles
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="4"> Jueves
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="5"> Viernes
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" value="6"> Sábado
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="cancelBtn">Cancelar</button>
+                        <button type="submit" class="btn-primary">Crear Tarea</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">
+                <i class="fas fa-tasks"></i>
+            </div>
+            <h3>No hay tareas aún</h3>
+            <p>Comienza creando tu primera tarea para organizar tu día</p>
+        </div>
+
+        <!-- Work Schedule Modal -->
+        <div class="modal" id="workScheduleModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Configurar Horario de Trabajo 6x4</h2>
+                    <button class="close-btn" id="closeWorkScheduleModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="workScheduleForm">
+                    <div class="form-group">
+                        <label for="workStartTime">Hora de Trabajo</label>
+                        <input type="time" id="workStartTime" value="16:00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="workStartDate">Fecha de Inicio</label>
+                        <input type="date" id="workStartDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="workDescription">Descripción</label>
+                        <input type="text" id="workDescription" value="Trabajo 6x4" placeholder="Descripción del trabajo">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="cancelWorkSchedule">Cancelar</button>
+                        <button type="submit" class="btn-primary">Configurar Horario</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Weekly Meeting Modal -->
+        <div class="modal" id="weeklyMeetingModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Configurar Reunión Semanal</h2>
+                    <button class="close-btn" id="closeWeeklyMeetingModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="weeklyMeetingForm">
+                    <div class="form-group">
+                        <label for="meetingTime">Hora de la Reunión</label>
+                        <input type="time" id="meetingTime" value="15:30" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Días de la Semana</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="meetingDays" value="3" checked> Miércoles
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="meetingDays" value="5" checked> Viernes
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="meetingDescription">Descripción</label>
+                        <input type="text" id="meetingDescription" value="Reunión de trabajo" placeholder="Descripción de la reunión">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="cancelWeeklyMeeting">Cancelar</button>
+                        <button type="submit" class="btn-primary">Configurar Reunión</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="script_simple.js" defer></script>
+</body>
+</html>
