@@ -1,81 +1,356 @@
-﻿// App State
+// App State
 let currentTab = "work";
 let tasks = JSON.parse(localStorage.getItem("rutinaApp_tasks")) || [];
+let events = JSON.parse(localStorage.getItem("rutinaApp_events")) || [];
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
 
-// DOM Elements
-const addTaskBtn = document.getElementById("addTaskBtn");
-const taskModal = document.getElementById("taskModal");
-const closeModal = document.getElementById("closeModal");
-const cancelBtn = document.getElementById("cancelBtn");
-const taskForm = document.getElementById("taskForm");
-const tabBtns = document.querySelectorAll(".tab-btn");
-const tabContents = document.querySelectorAll(".tab-content");
-const emptyState = document.getElementById("emptyState");
+// Capacitor imports
+let PushNotifications;
+let App;
+let Haptics;
+
+// Check if running in Capacitor
+if (typeof window !== 'undefined' && window.Capacitor) {
+  try {
+    PushNotifications = window.Capacitor.Plugins.PushNotifications;
+    App = window.Capacitor.Plugins.App;
+    Haptics = window.Capacitor.Plugins.Haptics;
+  } catch (e) {
+    console.log('Capacitor plugins not available:', e);
+  }
+}
 
 // Initialize App
 document.addEventListener("DOMContentLoaded", () => {
+    console.log("App initialized");
     initializeApp();
     setupEventListeners();
+    initializePushNotifications();
     renderTasks();
     updateEmptyState();
+    updateDateTime();
+    renderCalendar();
+    renderTodayEvents();
+    renderUpcomingEvents();
+    
+    // Update time every second
+    setInterval(updateDateTime, 1000);
 });
 
 function initializeApp() {
+    console.log("Initializing app...");
     // Set current time as default
     const now = new Date();
     const timeString = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    document.getElementById("taskTime").value = timeString;
+    
+    const workStartDate = document.getElementById("workStartDate");
+    if (workStartDate) {
+        workStartDate.value = now.toISOString().split('T')[0];
+    }
+    
+    const taskTimeEl = document.getElementById("taskTime");
+    if (taskTimeEl) {
+        taskTimeEl.value = timeString;
+    }
+}
+
+// Initialize Push Notifications
+async function initializePushNotifications() {
+    if (!PushNotifications) {
+        console.log('Push notifications not available');
+        return;
+    }
+
+    try {
+        // Request permission
+        const permission = await PushNotifications.requestPermissions();
+        if (permission.receive === 'granted') {
+            console.log('Push notification permission granted');
+            
+            // Register for push notifications
+            await PushNotifications.register();
+            
+            // Listen for registration
+            PushNotifications.addListener('registration', (token) => {
+                console.log('Push registration success: ', token.value);
+                // Save token to localStorage for later use
+                localStorage.setItem('pushToken', token.value);
+            });
+            
+            // Listen for registration errors
+            PushNotifications.addListener('registrationError', (error) => {
+                console.error('Error on registration: ', error);
+            });
+            
+            // Listen for push notifications received
+            PushNotifications.addListener('pushNotificationReceived', (notification) => {
+                console.log('Push notification received: ', notification);
+                showNotification(notification.title || 'Nueva notificación', 'event');
+                
+                // Haptic feedback
+                if (Haptics) {
+                    Haptics.impact({ style: 'medium' });
+                }
+            });
+            
+            // Listen for push notifications clicked
+            PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+                console.log('Push notification action performed: ', notification);
+                // Handle notification tap
+                if (notification.notification.data && notification.notification.data.action) {
+                    handleNotificationAction(notification.notification.data.action);
+                }
+            });
+            
+        } else {
+            console.log('Push notification permission denied');
+        }
+    } catch (error) {
+        console.error('Error initializing push notifications:', error);
+    }
 }
 
 function setupEventListeners() {
+    console.log("Setting up event listeners...");
+    
     // Modal controls
-    addTaskBtn.addEventListener("click", openModal);
-    closeModal.addEventListener("click", closeModalFunc);
-    cancelBtn.addEventListener("click", closeModalFunc);
+    const addTaskBtn = document.getElementById("addTaskBtn");
+    const taskModal = document.getElementById("taskModal");
+    const closeModal = document.getElementById("closeModal");
+    const cancelBtn = document.getElementById("cancelBtn");
+    const taskForm = document.getElementById("taskForm");
+    
+    if (addTaskBtn) {
+        addTaskBtn.addEventListener("click", openModal);
+    }
+    if (closeModal) {
+        closeModal.addEventListener("click", closeModalFunc);
+    }
+    if (cancelBtn) {
+        cancelBtn.addEventListener("click", closeModalFunc);
+    }
+    if (taskForm) {
+        taskForm.addEventListener("submit", handleTaskSubmit);
+    }
     
     // Close modal when clicking outside
-    taskModal.addEventListener("click", (e) => {
-        if (e.target === taskModal) {
-            closeModalFunc();
-        }
-    });
-    
-    // Form submission
-    taskForm.addEventListener("submit", handleTaskSubmit);
+    if (taskModal) {
+        taskModal.addEventListener("click", (e) => {
+            if (e.target === taskModal) {
+                closeModalFunc();
+            }
+        });
+    }
     
     // Tab switching
+    const tabBtns = document.querySelectorAll(".tab-btn");
     tabBtns.forEach(btn => {
         btn.addEventListener("click", () => switchTab(btn.dataset.tab));
     });
+
+    // Calendar navigation
+    const prevMonthBtn = document.getElementById("prevMonth");
+    const nextMonthBtn = document.getElementById("nextMonth");
+    
+    if (prevMonthBtn) {
+        prevMonthBtn.addEventListener("click", () => {
+            currentMonth--;
+            if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCalendar();
+        });
+    }
+
+    if (nextMonthBtn) {
+        nextMonthBtn.addEventListener("click", () => {
+            currentMonth++;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            }
+            renderCalendar();
+        });
+    }
+
+    // Event modal controls
+    const addWorkScheduleBtn = document.getElementById("addWorkScheduleBtn");
+    const addWeeklyMeetingBtn = document.getElementById("addWeeklyMeetingBtn");
+    
+    if (addWorkScheduleBtn) {
+        addWorkScheduleBtn.addEventListener("click", openWorkScheduleModal);
+    }
+    if (addWeeklyMeetingBtn) {
+        addWeeklyMeetingBtn.addEventListener("click", openWeeklyMeetingModal);
+    }
+    
+    // Close buttons for event modals
+    const closeWorkScheduleModal = document.getElementById("closeWorkScheduleModal");
+    const closeWeeklyMeetingModal = document.getElementById("closeWeeklyMeetingModal");
+    const cancelWorkSchedule = document.getElementById("cancelWorkSchedule");
+    const cancelWeeklyMeeting = document.getElementById("cancelWeeklyMeeting");
+    
+    if (closeWorkScheduleModal) {
+        closeWorkScheduleModal.addEventListener("click", () => closeWorkScheduleModalFunc());
+    }
+    if (closeWeeklyMeetingModal) {
+        closeWeeklyMeetingModal.addEventListener("click", () => closeWeeklyMeetingModalFunc());
+    }
+    if (cancelWorkSchedule) {
+        cancelWorkSchedule.addEventListener("click", () => closeWorkScheduleModalFunc());
+    }
+    if (cancelWeeklyMeeting) {
+        cancelWeeklyMeeting.addEventListener("click", () => closeWeeklyMeetingModalFunc());
+    }
+
+    // Event form submissions
+    const workScheduleForm = document.getElementById("workScheduleForm");
+    const weeklyMeetingForm = document.getElementById("weeklyMeetingForm");
+    
+    if (workScheduleForm) {
+        workScheduleForm.addEventListener("submit", handleWorkScheduleSubmit);
+    }
+    if (weeklyMeetingForm) {
+        weeklyMeetingForm.addEventListener("submit", handleWeeklyMeetingSubmit);
+    }
+
+    // Close modals when clicking outside
+    const workScheduleModal = document.getElementById("workScheduleModal");
+    const weeklyMeetingModal = document.getElementById("weeklyMeetingModal");
+    
+    if (workScheduleModal) {
+        workScheduleModal.addEventListener("click", (e) => {
+            if (e.target === workScheduleModal) closeWorkScheduleModalFunc();
+        });
+    }
+    if (weeklyMeetingModal) {
+        weeklyMeetingModal.addEventListener("click", (e) => {
+            if (e.target === weeklyMeetingModal) closeWeeklyMeetingModalFunc();
+        });
+    }
+}
+
+// Date and Time Functions
+function updateDateTime() {
+    const currentDateEl = document.getElementById("currentDate");
+    const currentTimeEl = document.getElementById("currentTime");
+    
+    if (!currentDateEl || !currentTimeEl) {
+        console.log("Date/time elements not found");
+        return;
+    }
+    
+    const now = new Date();
+    
+    // Update date
+    const dateOptions = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric'
+    };
+    currentDateEl.textContent = now.toLocaleDateString('es-ES', dateOptions);
+    
+    // Update time
+    const timeOptions = {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    };
+    currentTimeEl.textContent = now.toLocaleTimeString('es-ES', timeOptions);
 }
 
 // Modal Functions
 function openModal() {
-    taskModal.classList.add("active");
-    document.body.style.overflow = "hidden";
-    document.getElementById("taskTitle").focus();
+    const taskModal = document.getElementById("taskModal");
+    if (taskModal) {
+        taskModal.classList.add("active");
+        document.body.style.overflow = "hidden";
+        const taskTitle = document.getElementById("taskTitle");
+        if (taskTitle) taskTitle.focus();
+    }
 }
 
 function closeModalFunc() {
-    taskModal.classList.remove("active");
-    document.body.style.overflow = "auto";
-    taskForm.reset();
-    initializeApp(); // Reset time to current time
+    const taskModal = document.getElementById("taskModal");
+    const taskForm = document.getElementById("taskForm");
+    const recurringOptions = document.getElementById("recurringOptions");
+    
+    if (taskModal) {
+        taskModal.classList.remove("active");
+        document.body.style.overflow = "auto";
+        if (taskForm) taskForm.reset();
+        if (recurringOptions) recurringOptions.style.display = "none";
+        initializeApp();
+    }
+}
+
+function openWorkScheduleModal() {
+    const workScheduleModal = document.getElementById("workScheduleModal");
+    if (workScheduleModal) {
+        workScheduleModal.classList.add("active");
+        document.body.style.overflow = "hidden";
+    }
+}
+
+function closeWorkScheduleModalFunc() {
+    const workScheduleModal = document.getElementById("workScheduleModal");
+    const workScheduleForm = document.getElementById("workScheduleForm");
+    if (workScheduleModal) {
+        workScheduleModal.classList.remove("active");
+        document.body.style.overflow = "auto";
+        // Reset the form to prevent duplicates
+        if (workScheduleForm) {
+            workScheduleForm.reset();
+        }
+    }
+}
+
+function openWeeklyMeetingModal() {
+    const weeklyMeetingModal = document.getElementById("weeklyMeetingModal");
+    if (weeklyMeetingModal) {
+        weeklyMeetingModal.classList.add("active");
+        document.body.style.overflow = "hidden";
+    }
+}
+
+function closeWeeklyMeetingModalFunc() {
+    const weeklyMeetingModal = document.getElementById("weeklyMeetingModal");
+    const weeklyMeetingForm = document.getElementById("weeklyMeetingForm");
+    if (weeklyMeetingModal) {
+        weeklyMeetingModal.classList.remove("active");
+        document.body.style.overflow = "auto";
+        // Reset the form to prevent duplicates
+        if (weeklyMeetingForm) {
+            weeklyMeetingForm.reset();
+        }
+    }
 }
 
 // Tab Functions
 function switchTab(tabName) {
+    console.log("Switching to tab:", tabName);
     currentTab = tabName;
     
     // Update tab buttons
+    const tabBtns = document.querySelectorAll(".tab-btn");
     tabBtns.forEach(btn => {
         btn.classList.toggle("active", btn.dataset.tab === tabName);
     });
     
     // Update tab content
+    const tabContents = document.querySelectorAll(".tab-content");
     tabContents.forEach(content => {
         content.classList.toggle("active", content.id === `${tabName}-content`);
     });
+    
+    if (tabName === "calendar") {
+        renderCalendar();
+        renderTodayEvents();
+        renderUpcomingEvents();
+    }
     
     renderTasks();
     updateEmptyState();
@@ -85,16 +360,34 @@ function switchTab(tabName) {
 function handleTaskSubmit(e) {
     e.preventDefault();
     
-    const formData = new FormData(taskForm);
+    const taskTitle = document.getElementById("taskTitle");
+    const taskCategory = document.getElementById("taskCategory");
+    const taskTime = document.getElementById("taskTime");
+    const taskPriority = document.getElementById("taskPriority");
+    const taskRecurring = document.getElementById("taskRecurring");
+    
+    if (!taskTitle || !taskCategory || !taskTime || !taskPriority) return;
+    
     const task = {
         id: Date.now().toString(),
-        title: formData.get("taskTitle") || document.getElementById("taskTitle").value,
-        category: formData.get("taskCategory") || document.getElementById("taskCategory").value,
-        time: formData.get("taskTime") || document.getElementById("taskTime").value,
-        priority: formData.get("taskPriority") || document.getElementById("taskPriority").value,
+        title: taskTitle.value,
+        category: taskCategory.value,
+        time: taskTime.value,
+        priority: taskPriority.value,
         completed: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        recurring: taskRecurring.value === "yes"
     };
+    
+    // Add recurring days if it's a recurring task
+    if (task.recurring) {
+        const checkboxes = document.querySelectorAll('#recurringOptions input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) {
+            showNotification("Selecciona al menos un día de la semana para tareas recurrentes", "warning");
+            return;
+        }
+        task.recurringDays = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    }
     
     addTask(task);
     closeModalFunc();
@@ -106,7 +399,6 @@ function addTask(task) {
     renderTasks();
     updateEmptyState();
     
-    // Show success notification
     showNotification("Tarea creada exitosamente", "success");
 }
 
@@ -128,13 +420,431 @@ function deleteTask(taskId) {
         saveTasks();
         renderTasks();
         updateEmptyState();
+        
         showNotification("Tarea eliminada", "warning");
+    }
+}
+
+// Event Functions
+function handleWorkScheduleSubmit(e) {
+    e.preventDefault();
+    
+    const startTime = document.getElementById("workStartTime");
+    const startDate = document.getElementById("workStartDate");
+    const description = document.getElementById("workDescription");
+    
+    if (!startTime || !startDate || !description) return;
+    
+    createWorkSchedule(new Date(startDate.value), startTime.value, description.value);
+    closeWorkScheduleModalFunc();
+}
+
+function handleWeeklyMeetingSubmit(e) {
+    e.preventDefault();
+    
+    const meetingTime = document.getElementById("meetingTime");
+    const description = document.getElementById("meetingDescription");
+    const checkboxes = document.querySelectorAll('#weeklyMeetingModal input[type="checkbox"]:checked');
+    
+    if (!meetingTime || !description) return;
+    
+    const selectedDays = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    
+    if (selectedDays.length === 0) {
+        showNotification("Selecciona al menos un día de la semana", "warning");
+        return;
+    }
+    
+    createWeeklyMeetings(selectedDays, meetingTime.value, description.value);
+    closeWeeklyMeetingModalFunc();
+}
+
+function createWorkSchedule(startDate, time, description) {
+    // Remove any existing work schedule to prevent duplicates
+    events = events.filter(event => event.type !== "work_schedule");
+    
+    const event = {
+        id: Date.now().toString(),
+        title: description,
+        type: "work_schedule",
+        time: time,
+        startDate: startDate.toISOString(),
+        pattern: "6x4", // 6 days on, 4 days off
+        recurring: true,
+        createdAt: new Date().toISOString()
+    };
+    
+    events.push(event);
+    saveEvents();
+    renderTodayEvents();
+    renderUpcomingEvents();
+    renderCalendar();
+    
+    showNotification("Horario de trabajo 6x4 configurado", "success");
+}
+
+function createWeeklyMeetings(days, time, description) {
+    // Remove any existing weekly meetings to prevent duplicates
+    events = events.filter(event => event.type !== "weekly_meeting");
+    
+    days.forEach(dayOfWeek => {
+        const event = {
+            id: Date.now().toString() + dayOfWeek,
+            title: description,
+            type: "weekly_meeting",
+            time: time,
+            dayOfWeek: dayOfWeek, // 0=Sunday, 1=Monday, etc.
+            recurring: true,
+            createdAt: new Date().toISOString()
+        };
+        
+        events.push(event);
+    });
+    
+    saveEvents();
+    renderTodayEvents();
+    renderUpcomingEvents();
+    renderCalendar();
+    
+    showNotification("Reuniones semanales configuradas", "success");
+}
+
+function getEventsForDate(date) {
+    const dayOfWeek = date.getDay();
+    
+    const dayEvents = [];
+    
+    // Get recurring events (ONLY work_schedule and weekly_meeting)
+    events.forEach(event => {
+        if (event.type === "weekly_meeting") {
+            if (event.dayOfWeek === dayOfWeek) {
+                dayEvents.push(event);
+            }
+        } else if (event.type === "work_schedule") {
+            // Only add work schedule if we have a valid start date
+            if (event.startDate) {
+                if (isWorkDay(date, new Date(event.startDate))) {
+                    dayEvents.push(event);
+                }
+            }
+        }
+    });
+    
+    // Get recurring tasks (these will NOT have colors in calendar)
+    tasks.forEach(task => {
+        if (task.recurring && task.recurringDays && task.recurringDays.includes(dayOfWeek)) {
+            dayEvents.push({
+                id: task.id,
+                title: task.title,
+                type: "recurring_task",
+                time: task.time,
+                category: task.category,
+                priority: task.priority,
+                recurring: true,
+                dayOfWeek: dayOfWeek
+            });
+        }
+    });
+    
+    return dayEvents;
+}
+
+function isWorkDay(date, startDate) {
+    // Ensure we have a valid start date
+    if (!startDate || isNaN(startDate.getTime())) {
+        return false;
+    }
+    
+    const daysDiff = Math.floor((date - startDate) / (1000 * 60 * 60 * 24));
+    
+    // If the date is before the start date, it's not a work day
+    if (daysDiff < 0) {
+        return false;
+    }
+    
+    // Calculate the position in the 10-day cycle (6 work + 4 rest)
+    const cycle = daysDiff % 10;
+    
+    // First 6 days (0-5) are work days, next 4 days (6-9) are rest days
+    const isWork = cycle < 6;
+    
+    console.log(`Date: ${date.toDateString()}, Start: ${startDate.toDateString()}, DaysDiff: ${daysDiff}, Cycle: ${cycle}, IsWork: ${isWork}`);
+    
+    return isWork;
+}
+
+// Calendar Functions
+function renderCalendar() {
+    const calendarGridEl = document.getElementById("calendarGrid");
+    const currentMonthEl = document.getElementById("currentMonth");
+    
+    if (!calendarGridEl || !currentMonthEl) {
+        console.log("Calendar elements not found");
+        return;
+    }
+    
+    const monthNames = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+    
+    currentMonthEl.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+    
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+    
+    calendarGridEl.innerHTML = "";
+    
+    // Add day headers
+    const dayHeaders = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+    dayHeaders.forEach(day => {
+        const dayHeader = document.createElement("div");
+        dayHeader.className = "calendar-header-day";
+        dayHeader.textContent = day;
+        calendarGridEl.appendChild(dayHeader);
+    });
+    
+    // Add calendar days
+    for (let i = 0; i < 42; i++) { // 6 weeks
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + i);
+        
+        const dayElement = document.createElement("div");
+        dayElement.className = "calendar-day";
+        dayElement.textContent = date.getDate();
+        dayElement.dataset.date = date.toISOString().split('T')[0];
+        
+        if (date.getMonth() !== currentMonth) {
+            dayElement.classList.add("other-month");
+        }
+        
+        if (date.toDateString() === new Date().toDateString()) {
+            dayElement.classList.add("today");
+        }
+        
+        const dayEvents = getEventsForDate(date);
+        if (dayEvents.length > 0) {
+            dayElement.classList.add("has-event");
+            
+            // Check if this day has work schedule (6x4 pattern) - ONLY this should be green
+            const hasWorkSchedule = dayEvents.some(event => event.type === "work_schedule");
+            const hasWeeklyMeeting = dayEvents.some(event => event.type === "weekly_meeting");
+            
+            // Debug: Log events for this day
+            if (dayEvents.length > 0) {
+                console.log(`Date: ${date.toDateString()}, Events:`, dayEvents.map(e => ({type: e.type, title: e.title})));
+            }
+            
+            // ONLY add work-schedule class for actual 6x4 work schedule (not recurring tasks)
+            if (hasWorkSchedule) {
+                // Double-check that this is actually a work day according to the 6x4 pattern
+                const workScheduleEvent = dayEvents.find(e => e.type === "work_schedule");
+                if (workScheduleEvent && workScheduleEvent.startDate) {
+                    const startDate = new Date(workScheduleEvent.startDate);
+                    if (isWorkDay(date, startDate)) {
+                        dayElement.classList.add("work-schedule");
+                        console.log(`Adding work-schedule class to ${date.toDateString()}`);
+                    } else {
+                        console.log(`NOT adding work-schedule class to ${date.toDateString()} - not a work day`);
+                    }
+                }
+            } else if (hasWeeklyMeeting) {
+                // ONLY add weekly-meeting class for actual weekly meetings (not recurring tasks)
+                dayElement.classList.add("weekly-meeting");
+                console.log(`Adding weekly-meeting class to ${date.toDateString()}`);
+            }
+            // NOTE: Recurring tasks (recurring_task) will have "has-event" class but NO color class
+        }
+        
+        // Add click event to show day events
+        dayElement.addEventListener("click", () => {
+            selectCalendarDay(date, dayElement);
+        });
+        
+        calendarGridEl.appendChild(dayElement);
+    }
+}
+
+function selectCalendarDay(date, dayElement) {
+    // Remove previous selection
+    const previousSelected = document.querySelector(".calendar-day.selected");
+    if (previousSelected) {
+        previousSelected.classList.remove("selected");
+    }
+    
+    // Add selection to current day
+    dayElement.classList.add("selected");
+    
+    // Show events for selected day
+    showSelectedDayEvents(date);
+}
+
+function showSelectedDayEvents(date) {
+    const selectedDayEventsEl = document.getElementById("selectedDayEvents");
+    const selectedDayEventsListEl = document.getElementById("selectedDayEventsList");
+    
+    if (!selectedDayEventsEl || !selectedDayEventsListEl) return;
+    
+    const dayEvents = getEventsForDate(date);
+    
+    // Format date for display
+    const dateOptions = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric'
+    };
+    const formattedDate = date.toLocaleDateString('es-ES', dateOptions);
+    
+    // Update section title
+    const titleEl = selectedDayEventsEl.querySelector("h3");
+    if (titleEl) {
+        titleEl.innerHTML = `<i class="fas fa-calendar-day"></i> Eventos del ${formattedDate}`;
+    }
+    
+    // Clear and populate events list
+    selectedDayEventsListEl.innerHTML = "";
+    
+    if (dayEvents.length === 0) {
+        selectedDayEventsListEl.innerHTML = `
+            <div style="text-align: center; color: #6c757d; padding: 2rem;">
+                <i class="fas fa-calendar-times" style="font-size: 2rem; margin-bottom: 1rem; display: block; color: #a0aec0;"></i>
+                <p>No hay eventos programados para este día</p>
+            </div>
+        `;
+    } else {
+        dayEvents.forEach(event => {
+            const eventElement = document.createElement("div");
+            eventElement.className = "event-item";
+            
+            eventElement.innerHTML = `
+                <div class="event-info">
+                    <div class="event-time">${formatTime(event.time)}</div>
+                    <div>
+                        <div class="event-title">${escapeHtml(event.title)}</div>
+                        <div class="event-type">${getEventTypeLabel(event.type)}</div>
+                    </div>
+                </div>
+            `;
+            
+            selectedDayEventsListEl.appendChild(eventElement);
+        });
+    }
+    
+    // Show the events section
+    selectedDayEventsEl.style.display = "block";
+    
+    // Scroll to events section smoothly
+    selectedDayEventsEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function renderTodayEvents() {
+    const todayEventsEl = document.getElementById("todayEvents");
+    
+    if (!todayEventsEl) {
+        console.log("Today events element not found");
+        return;
+    }
+    
+    const today = new Date();
+    const todayEvents = getEventsForDate(today);
+    
+    todayEventsEl.innerHTML = "";
+    
+    if (todayEvents.length === 0) {
+        todayEventsEl.innerHTML = '<p style="color: #6c757d; text-align: center;">No hay eventos programados para hoy</p>';
+        return;
+    }
+    
+    todayEvents.forEach(event => {
+        const eventElement = document.createElement("div");
+        eventElement.className = "event-item";
+        
+        eventElement.innerHTML = `
+            <div class="event-info">
+                <div class="event-time">${formatTime(event.time)}</div>
+                <div>
+                    <div class="event-title">${escapeHtml(event.title)}</div>
+                    <div class="event-type">${getEventTypeLabel(event.type)}</div>
+                </div>
+            </div>
+        `;
+        
+        todayEventsEl.appendChild(eventElement);
+    });
+}
+
+function renderUpcomingEvents() {
+    const upcomingEventsEl = document.getElementById("upcomingEvents");
+    
+    if (!upcomingEventsEl) {
+        console.log("Upcoming events element not found");
+        return;
+    }
+    
+    const upcoming = [];
+    const today = new Date();
+    
+    // Get next 7 days of events
+    for (let i = 1; i <= 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        const dayEvents = getEventsForDate(date);
+        
+        dayEvents.forEach(event => {
+            upcoming.push({
+                ...event,
+                date: date
+            });
+        });
+    }
+    
+    upcomingEventsEl.innerHTML = "";
+    
+    if (upcoming.length === 0) {
+        upcomingEventsEl.innerHTML = '<p style="color: #6c757d; text-align: center;">No hay eventos próximos</p>';
+        return;
+    }
+    
+    upcoming.slice(0, 5).forEach(event => {
+        const eventElement = document.createElement("div");
+        eventElement.className = "event-item";
+        
+        const dateStr = event.date.toLocaleDateString('es-ES', { 
+            weekday: 'short', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+        
+        eventElement.innerHTML = `
+            <div class="event-info">
+                <div class="event-time">${dateStr}</div>
+                <div>
+                    <div class="event-title">${escapeHtml(event.title)}</div>
+                    <div class="event-type">${formatTime(event.time)} - ${getEventTypeLabel(event.type)}</div>
+                </div>
+            </div>
+        `;
+        
+        upcomingEventsEl.appendChild(eventElement);
+    });
+}
+
+function getEventTypeLabel(type) {
+    switch (type) {
+        case "work_schedule": return "Trabajo 6x4";
+        case "weekly_meeting": return "Reunión";
+        case "recurring_task": return "Tarea Recurrente";
+        default: return "Evento";
     }
 }
 
 function renderTasks() {
     const workTasksContainer = document.getElementById("work-tasks");
     const lifeTasksContainer = document.getElementById("life-tasks");
+    
+    if (!workTasksContainer || !lifeTasksContainer) return;
     
     // Clear containers
     workTasksContainer.innerHTML = "";
@@ -196,7 +906,20 @@ function saveTasks() {
     localStorage.setItem("rutinaApp_tasks", JSON.stringify(tasks));
 }
 
+function saveEvents() {
+    localStorage.setItem("rutinaApp_events", JSON.stringify(events));
+}
+
 function updateEmptyState() {
+    const emptyState = document.getElementById("emptyState");
+    
+    if (!emptyState) return;
+    
+    if (currentTab === "calendar") {
+        emptyState.style.display = "none";
+        return;
+    }
+    
     const currentTasks = tasks.filter(t => t.category === currentTab);
     const isEmpty = currentTasks.length === 0;
     
@@ -236,9 +959,28 @@ function showNotification(message, type = "info") {
     // Create notification element
     const notification = document.createElement("div");
     notification.className = `notification notification-${type}`;
+    
+    let bgColor = "#17a2b8";
+    let icon = "info-circle";
+    
+    switch (type) {
+        case "success":
+            bgColor = "#28a745";
+            icon = "check-circle";
+            break;
+        case "warning":
+            bgColor = "#ffc107";
+            icon = "exclamation-triangle";
+            break;
+        case "event":
+            bgColor = "#667eea";
+            icon = "bell";
+            break;
+    }
+    
     notification.innerHTML = `
         <div class="notification-content">
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+            <i class="fas fa-${icon}"></i>
             <span>${message}</span>
         </div>
     `;
@@ -248,7 +990,7 @@ function showNotification(message, type = "info") {
         position: fixed;
         top: 20px;
         right: 20px;
-        background: ${type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#17a2b8'};
+        background: ${bgColor};
         color: white;
         padding: 1rem 1.5rem;
         border-radius: 8px;
@@ -278,19 +1020,95 @@ function showNotification(message, type = "info") {
     }, 3000);
 }
 
-// Keyboard shortcuts
-document.addEventListener("keydown", (e) => {
-    // Ctrl/Cmd + N to add new task
-    if ((e.ctrlKey || e.metaKey) && e.key === "n") {
-        e.preventDefault();
-        openModal();
-    }
+// Add function to toggle recurring options
+function toggleRecurringOptions() {
+    const recurringSelect = document.getElementById("taskRecurring");
+    const recurringOptions = document.getElementById("recurringOptions");
     
-    // Escape to close modal
-    if (e.key === "Escape" && taskModal.classList.contains("active")) {
-        closeModalFunc();
+    if (recurringSelect && recurringOptions) {
+        if (recurringSelect.value === "yes") {
+            recurringOptions.style.display = "block";
+        } else {
+            recurringOptions.style.display = "none";
+        }
     }
-});
+}
+
+// Handle notification actions
+function handleNotificationAction(action) {
+    switch (action) {
+        case 'open_calendar':
+            switchTab('calendar');
+            break;
+        case 'add_task':
+            openModal();
+            break;
+        case 'view_today':
+            switchTab('calendar');
+            renderTodayEvents();
+            break;
+        default:
+            console.log('Unknown notification action:', action);
+    }
+}
+
+// Schedule local notifications for events
+function scheduleEventNotifications() {
+    if (!PushNotifications) return;
+    
+    // Schedule notifications for upcoming events
+    const today = new Date();
+    for (let i = 1; i <= 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        const dayEvents = getEventsForDate(date);
+        
+        dayEvents.forEach(event => {
+            // Schedule notification 1 hour before event
+            const eventTime = new Date(date);
+            const [hours, minutes] = event.time.split(':');
+            eventTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            
+            const notificationTime = new Date(eventTime.getTime() - (60 * 60 * 1000)); // 1 hour before
+            
+            if (notificationTime > new Date()) {
+                scheduleLocalNotification(
+                    `Recordatorio: ${event.title}`,
+                    `Tu evento "${event.title}" comienza en 1 hora`,
+                    notificationTime,
+                    {
+                        action: 'view_today',
+                        eventId: event.id
+                    }
+                );
+            }
+        });
+    }
+}
+
+// Schedule a local notification
+function scheduleLocalNotification(title, body, scheduledTime, data = {}) {
+    if (!PushNotifications) return;
+    
+    try {
+        // This would require additional setup with local notifications plugin
+        // For now, we'll use the browser's notification API as fallback
+        if ('Notification' in window && Notification.permission === 'granted') {
+            const timeUntilNotification = scheduledTime.getTime() - Date.now();
+            if (timeUntilNotification > 0) {
+                setTimeout(() => {
+                    new Notification(title, {
+                        body: body,
+                        icon: '/icon.png',
+                        data: data
+                    });
+                }, timeUntilNotification);
+            }
+        }
+    } catch (error) {
+        console.error('Error scheduling notification:', error);
+    }
+}
 
 // Add some sample tasks on first load
 if (tasks.length === 0) {
@@ -326,6 +1144,4 @@ if (tasks.length === 0) {
     
     tasks = sampleTasks;
     saveTasks();
-    renderTasks();
-    updateEmptyState();
 }
